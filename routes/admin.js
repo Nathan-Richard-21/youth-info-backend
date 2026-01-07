@@ -7,10 +7,16 @@ const Application = require('../models/Application');
 const Report = require('../models/Report');
 const OpenAI = require('openai');
 
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialize OpenAI - only when needed
+let openai = null;
+function getOpenAI() {
+  if (!openai && process.env.OPENAI_API_KEY) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openai;
+}
 
 // ============ DASHBOARD STATS ============
 router.get('/stats', auth, isAdmin, async (req, res) => {
@@ -476,7 +482,12 @@ Format your response as JSON:
   "recommendations": ["recommendation1", "recommendation2", ...]
 }`;
 
-      const completion = await openai.chat.completions.create({
+      const openaiClient = getOpenAI();
+      if (!openaiClient) {
+        return res.status(503).json({ error: 'AI service not configured' });
+      }
+
+      const completion = await openaiClient.chat.completions.create({
         model: 'gpt-4',
         messages: [
           {

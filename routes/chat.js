@@ -3,10 +3,16 @@ const router = express.Router();
 const { auth } = require('../utils/authMiddleware');
 const OpenAI = require('openai');
 
-// Initialize OpenAI with API key from environment
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialize OpenAI - only when needed
+let openai = null;
+function getOpenAI() {
+  if (!openai && process.env.OPENAI_API_KEY) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openai;
+}
 
 // GPT-powered career chatbot using OpenAI GPT-4
 router.post('/gpt', auth, async (req, res) => {
@@ -63,7 +69,13 @@ Keep responses concise (2-3 paragraphs max) and include practical steps when pos
     console.log('🚀 Calling OpenAI API with GPT-4...');
 
     // Call OpenAI API with GPT-4 (or fallback to GPT-3.5-turbo if GPT-4 not available)
-    const completion = await openai.chat.completions.create({
+    const openaiClient = getOpenAI();
+    if (!openaiClient) {
+      const response = generateCareerResponse(message);
+      return res.json({ message: response });
+    }
+
+    const completion = await openaiClient.chat.completions.create({
       model: 'gpt-4', // Using GPT-4 (latest available model)
       messages: messages,
       max_tokens: 500,
@@ -247,7 +259,12 @@ Focus on directing youth to appropriate services and resources in South Africa.`
     console.log('🚀 Calling OpenAI API for medical chat...');
 
     // Call OpenAI API with GPT-4
-    const completion = await openai.chat.completions.create({
+    const openaiClient = getOpenAI();
+    if (!openaiClient) {
+      return res.json({ reply: 'AI service is currently unavailable. Please try again later.' });
+    }
+
+    const completion = await openaiClient.chat.completions.create({
       model: 'gpt-4',
       messages: messages,
       max_tokens: 500,
